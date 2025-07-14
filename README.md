@@ -1,6 +1,6 @@
 # Rainbow Islands - Retro Platform Game
 
-A Python/Pygame recreation inspired by the classic Rainbow Islands arcade game.
+A Python/Pygame-CE recreation inspired by the classic Rainbow Islands arcade game.
 
 ## Features
 
@@ -64,7 +64,7 @@ python rainbow_islands_game.py
 
 ## Technical Details
 
-- Built with Python and Pygame
+- Built with Python and Pygame-CE
 - 60 FPS gameplay
 - 800x600 resolution
 - Object-oriented design with separate classes for Player, Enemies, Platforms, and Rainbows

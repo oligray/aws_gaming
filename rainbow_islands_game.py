@@ -4,7 +4,7 @@ import math
 import random
 from enum import Enum
 
-# Initialize Pygame
+# Initialize Pygame-CE
 pygame.init()
 
 # Constants
@@ -96,14 +96,35 @@ class Player:
                     self.x = platform.x + platform.width
                     
         # Check rainbow collisions (rainbows act as platforms)
+        jumped_on_rainbow = None
         for rainbow in rainbows:
-            if rainbow.solid:
-                rainbow_rect = pygame.Rect(rainbow.x, rainbow.y, rainbow.width, rainbow.height)
-                if player_rect.colliderect(rainbow_rect):
-                    if self.vel_y > 0 and self.y < rainbow.y:
-                        self.y = rainbow.y - self.height
-                        self.vel_y = 0
-                        self.on_ground = True
+            if rainbow.solid and not rainbow.dissolving:
+                # Check collision with arced rainbow bridge
+                player_center_x = self.x + self.width // 2
+                
+                # Check if player is horizontally within the rainbow bridge
+                if rainbow.x <= player_center_x <= rainbow.x + rainbow.bridge_width:
+                    # Calculate the arc height at the player's position
+                    x_progress = (player_center_x - rainbow.x) / rainbow.bridge_width
+                    arc_height = 20  # Same as in draw method
+                    arc_y_offset = arc_height * math.sin(x_progress * math.pi)
+                    rainbow_top_y = rainbow.y - arc_y_offset
+                    
+                    # Create collision rect for this position on the arc
+                    rainbow_rect = pygame.Rect(player_center_x - 5, rainbow_top_y, 10, rainbow.bridge_height)
+                    player_rect = pygame.Rect(self.x, self.y, self.width, self.height)
+                    
+                    if player_rect.colliderect(rainbow_rect):
+                        if self.vel_y > 0 and self.y < rainbow_top_y:
+                            # Check if player jumped onto the rainbow (high downward velocity indicates jump landing)
+                            if self.vel_y > 5:  # Player was falling fast (jumped)
+                                jumped_on_rainbow = rainbow
+                            self.y = rainbow_top_y - self.height
+                            self.vel_y = 0
+                            self.on_ground = True
+                            break  # Only collide with one rainbow at a time
+        
+        return jumped_on_rainbow
         
         # Keep player on screen
         if self.x < 0:
@@ -115,13 +136,17 @@ class Player:
         if self.y > SCREEN_HEIGHT:
             return False
             
-        return True
+        # Return the rainbow that was jumped on, or True if no special event
+        return jumped_on_rainbow if jumped_on_rainbow else True
     
     def shoot_rainbow(self):
         if self.rainbow_cooldown <= 0:
             self.rainbow_cooldown = 30  # Cooldown frames
             direction = 1 if self.facing_right else -1
-            return Rainbow(self.x + self.width // 2, self.y + self.height // 2, direction)
+            # Spawn rainbow close to character (within 20 pixels)
+            spawn_x = self.x + (20 if self.facing_right else -20)
+            spawn_y = self.y + self.height // 2  # Middle height of character
+            return Rainbow(spawn_x, spawn_y, direction)
         return None
     
     def draw(self, screen):
@@ -189,18 +214,43 @@ class Rainbow:
         self.direction = direction
         self.width = 8
         self.height = 8
-        self.speed = 8
+        self.speed = 0.8  # Reduced from 8 to limit horizontal travel to 20 pixels
         self.lifetime = 120  # frames
         self.solid = False
         self.solid_timer = 0
         self.arc_progress = 0
-        self.max_arc = 100
+        self.max_arc = 25  # With speed=0.8 and increment=2: 0.8 * 25 = 20 pixels
+        self.bridge_width = 100
+        self.bridge_height = 12  # Height of the rainbow bridge
+        self.dissolving = False
+        self.dissolve_timer = 0
+        
+    def dissolve(self):
+        """Start the dissolution process"""
+        if self.solid and not self.dissolving:
+            self.dissolving = True
+            self.dissolve_timer = 0
+            return True
+        return False
         
     def update(self):
+        # Handle dissolution
+        if self.dissolving:
+            self.dissolve_timer += 1
+            if self.dissolve_timer > 30:  # Dissolve over 30 frames (0.5 seconds)
+                return False
+            return True
+            
         # Move rainbow in an arc
         self.arc_progress += 2
         if self.arc_progress > self.max_arc:
-            self.solid = True
+            if not self.solid:
+                # Just became solid - set up bridge dimensions and position
+                self.solid = True
+                self.width = self.bridge_width
+                self.height = self.bridge_height
+                # Center the bridge on the final position
+                self.x = self.x - (self.bridge_width // 2)
             self.solid_timer += 1
             if self.solid_timer > 300:  # Rainbow bridge lasts 5 seconds
                 return False
@@ -215,12 +265,37 @@ class Rainbow:
         
     def draw(self, screen):
         if self.solid:
-            # Draw as a solid rainbow bridge
-            for i, color in enumerate(RAINBOW_COLORS):
-                y_offset = i * 2
-                pygame.draw.rect(screen, color, (self.x - 50, self.y + y_offset, 100, 2))
-            self.width = 100
-            self.height = len(RAINBOW_COLORS) * 2
+            # Draw as a solid rainbow bridge in an arc shape
+            alpha = 255
+            if self.dissolving:
+                # Fade out during dissolution
+                alpha = max(0, 255 - (self.dissolve_timer * 8))
+            
+            # Draw rainbow as an arc (hill shape)
+            arc_height = 20  # Height of the arc at the center
+            segments = 20  # Number of segments to create smooth arc
+            segment_width = self.bridge_width // segments
+            
+            for segment in range(segments):
+                # Calculate arc position for this segment
+                x_progress = segment / (segments - 1)  # 0 to 1
+                arc_y_offset = arc_height * math.sin(x_progress * math.pi)  # Sine wave for hill shape
+                
+                segment_x = self.x + (segment * segment_width)
+                segment_y = self.y - arc_y_offset  # Subtract to go upward
+                
+                # Draw each color stripe of the rainbow for this segment
+                for i, color in enumerate(RAINBOW_COLORS):
+                    stripe_y = segment_y + (i * 2)
+                    
+                    # Create a surface for alpha blending if dissolving
+                    if self.dissolving and alpha < 255:
+                        surf = pygame.Surface((segment_width + 1, 2))  # +1 to avoid gaps
+                        surf.set_alpha(alpha)
+                        surf.fill(color)
+                        screen.blit(surf, (segment_x, stripe_y))
+                    else:
+                        pygame.draw.rect(screen, color, (segment_x, stripe_y, segment_width + 1, 2))
         else:
             # Draw as moving rainbow projectile
             color_index = (pygame.time.get_ticks() // 100) % len(RAINBOW_COLORS)
@@ -291,8 +366,28 @@ class Game:
     def update(self):
         if self.state == GameState.PLAYING:
             # Update player
-            if not self.player.update(self.platforms, self.rainbows):
+            jumped_rainbow = self.player.update(self.platforms, self.rainbows)
+            if jumped_rainbow is False:  # Player died
                 self.state = GameState.GAME_OVER
+            elif jumped_rainbow:  # Player jumped on a rainbow
+                # Dissolve the rainbow
+                jumped_rainbow.dissolve()
+                # Kill any monsters underneath the rainbow arc
+                arc_height = 20
+                for enemy in self.enemies:
+                    if enemy.alive:
+                        enemy_center_x = enemy.x + enemy.width // 2
+                        # Check if enemy is horizontally within the rainbow bridge
+                        if jumped_rainbow.x <= enemy_center_x <= jumped_rainbow.x + jumped_rainbow.bridge_width:
+                            # Calculate the arc height at the enemy's position
+                            x_progress = (enemy_center_x - jumped_rainbow.x) / jumped_rainbow.bridge_width
+                            arc_y_offset = arc_height * math.sin(x_progress * math.pi)
+                            rainbow_bottom_y = jumped_rainbow.y - arc_y_offset + jumped_rainbow.bridge_height
+                            
+                            # Check if enemy is underneath the rainbow at this position
+                            if enemy.y >= rainbow_bottom_y:
+                                enemy.alive = False
+                                self.score += 100  # Award points for killing enemy
                 
             # Update enemies
             for enemy in self.enemies:
