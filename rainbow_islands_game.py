@@ -124,8 +124,6 @@ class Player:
                             self.on_ground = True
                             break  # Only collide with one rainbow at a time
         
-        return jumped_on_rainbow
-        
         # Keep player on screen
         if self.x < 0:
             self.x = 0
@@ -369,7 +367,7 @@ class Game:
             jumped_rainbow = self.player.update(self.platforms, self.rainbows)
             if jumped_rainbow is False:  # Player died
                 self.state = GameState.GAME_OVER
-            elif jumped_rainbow:  # Player jumped on a rainbow
+            elif jumped_rainbow is not True:  # Player jumped on a rainbow (returned Rainbow object)
                 # Dissolve the rainbow
                 jumped_rainbow.dissolve()
                 # Kill any monsters underneath the rainbow arc
