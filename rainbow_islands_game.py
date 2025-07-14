@@ -77,52 +77,75 @@ class Player:
         self.on_ground = False
         player_rect = pygame.Rect(self.x, self.y, self.width, self.height)
         
-        for platform in platforms:
-            platform_rect = pygame.Rect(platform.x, platform.y, platform.width, platform.height)
-            if player_rect.colliderect(platform_rect):
-                # Landing on top of platform
-                if self.vel_y > 0 and self.y < platform.y:
-                    self.y = platform.y - self.height
-                    self.vel_y = 0
-                    self.on_ground = True
-                # Hitting platform from below
-                elif self.vel_y < 0 and self.y > platform.y:
-                    self.y = platform.y + platform.height
-                    self.vel_y = 0
-                # Side collisions
-                elif self.vel_x > 0:  # Moving right
-                    self.x = platform.x - self.width
-                elif self.vel_x < 0:  # Moving left
-                    self.x = platform.x + platform.width
+        # First check if player is currently on a rainbow
+        on_rainbow = False
+        for rainbow in rainbows:
+            if rainbow.solid and not rainbow.dissolving:
+                player_center_x = self.x + self.width // 2
+                if rainbow.x <= player_center_x <= rainbow.x + rainbow.bridge_width:
+                    # Calculate if player is actually on this rainbow surface
+                    x_progress = (player_center_x - rainbow.x) / rainbow.bridge_width
+                    arc_height = 20
+                    arc_y_offset = arc_height * math.sin(x_progress * math.pi)
+                    rainbow_top_y = rainbow.y - arc_y_offset
+                    
+                    # Check if player is close to the rainbow surface
+                    if abs(self.y + self.height - rainbow_top_y) < 10:
+                        on_rainbow = True
+                        break
+        
+        # Only apply platform collisions if NOT on a rainbow
+        if not on_rainbow:
+            for platform in platforms:
+                platform_rect = pygame.Rect(platform.x, platform.y, platform.width, platform.height)
+                if player_rect.colliderect(platform_rect):
+                    # Landing on top of platform
+                    if self.vel_y > 0 and self.y < platform.y:
+                        self.y = platform.y - self.height
+                        self.vel_y = 0
+                        self.on_ground = True
+                    # Side collisions
+                    elif self.vel_x > 0:  # Moving right
+                        self.x = platform.x - self.width
+                    elif self.vel_x < 0:  # Moving left
+                        self.x = platform.x + platform.width
                     
         # Check rainbow collisions (rainbows act as platforms)
         jumped_on_rainbow = None
+        valid_rainbows = []
+        
+        # First, find all rainbows the player could potentially land on
         for rainbow in rainbows:
             if rainbow.solid and not rainbow.dissolving:
-                # Check collision with arced rainbow bridge
                 player_center_x = self.x + self.width // 2
                 
                 # Check if player is horizontally within the rainbow bridge
                 if rainbow.x <= player_center_x <= rainbow.x + rainbow.bridge_width:
                     # Calculate the arc height at the player's position
                     x_progress = (player_center_x - rainbow.x) / rainbow.bridge_width
-                    arc_height = 20  # Same as in draw method
+                    arc_height = 20
                     arc_y_offset = arc_height * math.sin(x_progress * math.pi)
                     rainbow_top_y = rainbow.y - arc_y_offset
                     
-                    # Create collision rect for this position on the arc
-                    rainbow_rect = pygame.Rect(player_center_x - 5, rainbow_top_y, 10, rainbow.bridge_height)
-                    player_rect = pygame.Rect(self.x, self.y, self.width, self.height)
-                    
-                    if player_rect.colliderect(rainbow_rect):
-                        if self.vel_y > 0 and self.y < rainbow_top_y:
-                            # Check if player jumped onto the rainbow (high downward velocity indicates jump landing)
-                            if self.vel_y > 5:  # Player was falling fast (jumped)
-                                jumped_on_rainbow = rainbow
-                            self.y = rainbow_top_y - self.height
-                            self.vel_y = 0
-                            self.on_ground = True
-                            break  # Only collide with one rainbow at a time
+                    # Only consider rainbows that are below the player
+                    if (self.vel_y > 0 and  # Player is falling
+                        self.y < rainbow_top_y and  # Player is above the rainbow
+                        self.y + self.height > rainbow_top_y - 15):  # Player is close enough
+                        
+                        valid_rainbows.append((rainbow, rainbow_top_y))
+        
+        # Sort by Y position (topmost first) and take the highest rainbow
+        if valid_rainbows:
+            valid_rainbows.sort(key=lambda x: x[1])  # Sort by rainbow_top_y
+            rainbow, rainbow_top_y = valid_rainbows[0]  # Take the topmost rainbow
+            
+            # Check if player jumped onto the rainbow
+            if self.vel_y > 5:  # Player was falling fast (jumped)
+                jumped_on_rainbow = rainbow
+            
+            self.y = rainbow_top_y - self.height
+            self.vel_y = 0
+            self.on_ground = True
         
         # Keep player on screen
         if self.x < 0:
