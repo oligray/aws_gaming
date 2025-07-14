@@ -1,0 +1,411 @@
+import pygame
+import sys
+import math
+import random
+from enum import Enum
+
+# Initialize Pygame
+pygame.init()
+
+# Constants
+SCREEN_WIDTH = 800
+SCREEN_HEIGHT = 600
+FPS = 60
+
+# Colors
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+BLUE = (0, 100, 255)
+GREEN = (0, 255, 0)
+RED = (255, 0, 0)
+YELLOW = (255, 255, 0)
+PURPLE = (255, 0, 255)
+ORANGE = (255, 165, 0)
+CYAN = (0, 255, 255)
+PINK = (255, 192, 203)
+
+# Rainbow colors for the rainbow bridges
+RAINBOW_COLORS = [RED, ORANGE, YELLOW, GREEN, CYAN, BLUE, PURPLE]
+
+class GameState(Enum):
+    PLAYING = 1
+    GAME_OVER = 2
+    LEVEL_COMPLETE = 3
+
+class Player:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.width = 32
+        self.height = 32
+        self.vel_x = 0
+        self.vel_y = 0
+        self.speed = 5
+        self.jump_power = -12
+        self.gravity = 0.5
+        self.on_ground = False
+        self.facing_right = True
+        self.rainbow_cooldown = 0
+        
+    def update(self, platforms, rainbows):
+        # Handle input
+        keys = pygame.key.get_pressed()
+        self.vel_x = 0
+        
+        if keys[pygame.K_LEFT] or keys[pygame.K_a]:
+            self.vel_x = -self.speed
+            self.facing_right = False
+        if keys[pygame.K_RIGHT] or keys[pygame.K_d]:
+            self.vel_x = self.speed
+            self.facing_right = True
+        if (keys[pygame.K_SPACE] or keys[pygame.K_UP] or keys[pygame.K_w]) and self.on_ground:
+            self.vel_y = self.jump_power
+            self.on_ground = False
+            
+        # Update rainbow cooldown
+        if self.rainbow_cooldown > 0:
+            self.rainbow_cooldown -= 1
+            
+        # Apply gravity
+        self.vel_y += self.gravity
+        
+        # Update position
+        self.x += self.vel_x
+        self.y += self.vel_y
+        
+        # Check platform collisions
+        self.on_ground = False
+        player_rect = pygame.Rect(self.x, self.y, self.width, self.height)
+        
+        for platform in platforms:
+            platform_rect = pygame.Rect(platform.x, platform.y, platform.width, platform.height)
+            if player_rect.colliderect(platform_rect):
+                # Landing on top of platform
+                if self.vel_y > 0 and self.y < platform.y:
+                    self.y = platform.y - self.height
+                    self.vel_y = 0
+                    self.on_ground = True
+                # Hitting platform from below
+                elif self.vel_y < 0 and self.y > platform.y:
+                    self.y = platform.y + platform.height
+                    self.vel_y = 0
+                # Side collisions
+                elif self.vel_x > 0:  # Moving right
+                    self.x = platform.x - self.width
+                elif self.vel_x < 0:  # Moving left
+                    self.x = platform.x + platform.width
+                    
+        # Check rainbow collisions (rainbows act as platforms)
+        for rainbow in rainbows:
+            if rainbow.solid:
+                rainbow_rect = pygame.Rect(rainbow.x, rainbow.y, rainbow.width, rainbow.height)
+                if player_rect.colliderect(rainbow_rect):
+                    if self.vel_y > 0 and self.y < rainbow.y:
+                        self.y = rainbow.y - self.height
+                        self.vel_y = 0
+                        self.on_ground = True
+        
+        # Keep player on screen
+        if self.x < 0:
+            self.x = 0
+        elif self.x > SCREEN_WIDTH - self.width:
+            self.x = SCREEN_WIDTH - self.width
+            
+        # Check if player fell off screen
+        if self.y > SCREEN_HEIGHT:
+            return False
+            
+        return True
+    
+    def shoot_rainbow(self):
+        if self.rainbow_cooldown <= 0:
+            self.rainbow_cooldown = 30  # Cooldown frames
+            direction = 1 if self.facing_right else -1
+            return Rainbow(self.x + self.width // 2, self.y + self.height // 2, direction)
+        return None
+    
+    def draw(self, screen):
+        # Draw player as a simple colored rectangle
+        color = BLUE if self.facing_right else CYAN
+        pygame.draw.rect(screen, color, (self.x, self.y, self.width, self.height))
+        # Draw eyes
+        eye_size = 4
+        if self.facing_right:
+            pygame.draw.circle(screen, WHITE, (int(self.x + 20), int(self.y + 10)), eye_size)
+            pygame.draw.circle(screen, BLACK, (int(self.x + 22), int(self.y + 10)), 2)
+        else:
+            pygame.draw.circle(screen, WHITE, (int(self.x + 12), int(self.y + 10)), eye_size)
+            pygame.draw.circle(screen, BLACK, (int(self.x + 10), int(self.y + 10)), 2)
+
+class Platform:
+    def __init__(self, x, y, width, height):
+        self.x = x
+        self.y = y
+        self.width = width
+        self.height = height
+        
+    def draw(self, screen):
+        pygame.draw.rect(screen, GREEN, (self.x, self.y, self.width, self.height))
+        pygame.draw.rect(screen, BLACK, (self.x, self.y, self.width, self.height), 2)
+
+class Enemy:
+    def __init__(self, x, y, patrol_start, patrol_end):
+        self.x = x
+        self.y = y
+        self.width = 24
+        self.height = 24
+        self.speed = 1
+        self.direction = 1
+        self.patrol_start = patrol_start
+        self.patrol_end = patrol_end
+        self.alive = True
+        
+    def update(self, platforms):
+        if not self.alive:
+            return
+            
+        # Move enemy
+        self.x += self.speed * self.direction
+        
+        # Reverse direction at patrol boundaries
+        if self.x <= self.patrol_start or self.x >= self.patrol_end - self.width:
+            self.direction *= -1
+            
+    def draw(self, screen):
+        if self.alive:
+            pygame.draw.rect(screen, RED, (self.x, self.y, self.width, self.height))
+            # Draw simple face
+            pygame.draw.circle(screen, WHITE, (int(self.x + 8), int(self.y + 8)), 3)
+            pygame.draw.circle(screen, WHITE, (int(self.x + 16), int(self.y + 8)), 3)
+            pygame.draw.circle(screen, BLACK, (int(self.x + 8), int(self.y + 8)), 1)
+            pygame.draw.circle(screen, BLACK, (int(self.x + 16), int(self.y + 8)), 1)
+
+class Rainbow:
+    def __init__(self, x, y, direction):
+        self.start_x = x
+        self.start_y = y
+        self.x = x
+        self.y = y
+        self.direction = direction
+        self.width = 8
+        self.height = 8
+        self.speed = 8
+        self.lifetime = 120  # frames
+        self.solid = False
+        self.solid_timer = 0
+        self.arc_progress = 0
+        self.max_arc = 100
+        
+    def update(self):
+        # Move rainbow in an arc
+        self.arc_progress += 2
+        if self.arc_progress > self.max_arc:
+            self.solid = True
+            self.solid_timer += 1
+            if self.solid_timer > 300:  # Rainbow bridge lasts 5 seconds
+                return False
+        else:
+            # Calculate arc position
+            progress = self.arc_progress / self.max_arc
+            self.x = self.start_x + (self.direction * self.speed * self.arc_progress)
+            self.y = self.start_y - (50 * math.sin(progress * math.pi))
+            
+        self.lifetime -= 1
+        return self.lifetime > 0 or self.solid
+        
+    def draw(self, screen):
+        if self.solid:
+            # Draw as a solid rainbow bridge
+            for i, color in enumerate(RAINBOW_COLORS):
+                y_offset = i * 2
+                pygame.draw.rect(screen, color, (self.x - 50, self.y + y_offset, 100, 2))
+            self.width = 100
+            self.height = len(RAINBOW_COLORS) * 2
+        else:
+            # Draw as moving rainbow projectile
+            color_index = (pygame.time.get_ticks() // 100) % len(RAINBOW_COLORS)
+            pygame.draw.circle(screen, RAINBOW_COLORS[color_index], (int(self.x), int(self.y)), 4)
+
+class Game:
+    def __init__(self):
+        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+        pygame.display.set_caption("Rainbow Islands - Retro Platform Game")
+        self.clock = pygame.time.Clock()
+        self.state = GameState.PLAYING
+        
+        # Initialize game objects
+        self.player = Player(100, 500)
+        self.platforms = self.create_level()
+        self.enemies = self.create_enemies()
+        self.rainbows = []
+        self.score = 0
+        self.level = 1
+        
+    def create_level(self):
+        platforms = [
+            # Ground platforms
+            Platform(0, 580, 200, 20),
+            Platform(300, 580, 200, 20),
+            Platform(600, 580, 200, 20),
+            
+            # Mid-level platforms
+            Platform(150, 450, 150, 20),
+            Platform(400, 400, 150, 20),
+            Platform(50, 320, 150, 20),
+            Platform(600, 350, 150, 20),
+            
+            # Upper platforms
+            Platform(250, 250, 150, 20),
+            Platform(450, 200, 150, 20),
+            Platform(100, 150, 150, 20),
+            Platform(550, 100, 150, 20),
+        ]
+        return platforms
+        
+    def create_enemies(self):
+        enemies = [
+            Enemy(320, 556, 300, 500),
+            Enemy(170, 426, 150, 300),
+            Enemy(420, 376, 400, 550),
+            Enemy(70, 296, 50, 200),
+            Enemy(620, 326, 600, 750),
+        ]
+        return enemies
+        
+    def handle_events(self):
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                return False
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_x or event.key == pygame.K_LCTRL:
+                    # Shoot rainbow
+                    rainbow = self.player.shoot_rainbow()
+                    if rainbow:
+                        self.rainbows.append(rainbow)
+                elif event.key == pygame.K_r and self.state == GameState.GAME_OVER:
+                    # Restart game
+                    self.__init__()
+                    
+        return True
+        
+    def update(self):
+        if self.state == GameState.PLAYING:
+            # Update player
+            if not self.player.update(self.platforms, self.rainbows):
+                self.state = GameState.GAME_OVER
+                
+            # Update enemies
+            for enemy in self.enemies:
+                enemy.update(self.platforms)
+                
+            # Check player-enemy collisions
+            player_rect = pygame.Rect(self.player.x, self.player.y, self.player.width, self.player.height)
+            for enemy in self.enemies:
+                if enemy.alive:
+                    enemy_rect = pygame.Rect(enemy.x, enemy.y, enemy.width, enemy.height)
+                    if player_rect.colliderect(enemy_rect):
+                        self.state = GameState.GAME_OVER
+                        
+            # Update rainbows
+            self.rainbows = [rainbow for rainbow in self.rainbows if rainbow.update()]
+            
+            # Check rainbow-enemy collisions
+            for rainbow in self.rainbows:
+                if not rainbow.solid:
+                    rainbow_rect = pygame.Rect(rainbow.x - 4, rainbow.y - 4, 8, 8)
+                    for enemy in self.enemies:
+                        if enemy.alive:
+                            enemy_rect = pygame.Rect(enemy.x, enemy.y, enemy.width, enemy.height)
+                            if rainbow_rect.colliderect(enemy_rect):
+                                enemy.alive = False
+                                self.score += 100
+                                
+            # Check if all enemies defeated
+            if all(not enemy.alive for enemy in self.enemies):
+                self.state = GameState.LEVEL_COMPLETE
+                
+    def draw(self):
+        self.screen.fill(WHITE)
+        
+        # Draw platforms
+        for platform in self.platforms:
+            platform.draw(self.screen)
+            
+        # Draw enemies
+        for enemy in self.enemies:
+            enemy.draw(self.screen)
+            
+        # Draw rainbows
+        for rainbow in self.rainbows:
+            rainbow.draw(self.screen)
+            
+        # Draw player
+        self.player.draw(self.screen)
+        
+        # Draw UI
+        font = pygame.font.Font(None, 36)
+        score_text = font.render(f"Score: {self.score}", True, BLACK)
+        self.screen.blit(score_text, (10, 10))
+        
+        level_text = font.render(f"Level: {self.level}", True, BLACK)
+        self.screen.blit(level_text, (10, 50))
+        
+        # Draw instructions
+        font_small = pygame.font.Font(None, 24)
+        instructions = [
+            "Arrow Keys / WASD: Move and Jump",
+            "X / Left Ctrl: Shoot Rainbow",
+            "Create rainbow bridges to reach higher platforms!"
+        ]
+        for i, instruction in enumerate(instructions):
+            text = font_small.render(instruction, True, BLACK)
+            self.screen.blit(text, (10, SCREEN_HEIGHT - 80 + i * 25))
+        
+        if self.state == GameState.GAME_OVER:
+            # Draw game over screen
+            overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+            overlay.set_alpha(128)
+            overlay.fill(BLACK)
+            self.screen.blit(overlay, (0, 0))
+            
+            font_large = pygame.font.Font(None, 72)
+            game_over_text = font_large.render("GAME OVER", True, RED)
+            text_rect = game_over_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 50))
+            self.screen.blit(game_over_text, text_rect)
+            
+            restart_text = font.render("Press R to Restart", True, WHITE)
+            text_rect = restart_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 20))
+            self.screen.blit(restart_text, text_rect)
+            
+        elif self.state == GameState.LEVEL_COMPLETE:
+            # Draw level complete screen
+            overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+            overlay.set_alpha(128)
+            overlay.fill(BLACK)
+            self.screen.blit(overlay, (0, 0))
+            
+            font_large = pygame.font.Font(None, 72)
+            complete_text = font_large.render("LEVEL COMPLETE!", True, GREEN)
+            text_rect = complete_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 50))
+            self.screen.blit(complete_text, text_rect)
+            
+            score_text = font.render(f"Final Score: {self.score}", True, WHITE)
+            text_rect = score_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 20))
+            self.screen.blit(score_text, text_rect)
+        
+        pygame.display.flip()
+        
+    def run(self):
+        running = True
+        while running:
+            running = self.handle_events()
+            self.update()
+            self.draw()
+            self.clock.tick(FPS)
+            
+        pygame.quit()
+        sys.exit()
+
+if __name__ == "__main__":
+    game = Game()
+    game.run()
