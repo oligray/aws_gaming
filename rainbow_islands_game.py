@@ -138,11 +138,15 @@ class Player:
         return jumped_on_rainbow if jumped_on_rainbow else True
     
     def shoot_rainbow(self):
+        offset = 34
         if self.rainbow_cooldown <= 0:
             self.rainbow_cooldown = 30  # Cooldown frames
             direction = 1 if self.facing_right else -1
-            # Spawn rainbow close to character (within 20 pixels)
-            spawn_x = self.x + (20 if self.facing_right else -20)
+            # Spawn rainbow right next to character
+            if self.facing_right:
+                spawn_x = self.x + self.width + offset  # Right edge of character
+            else:
+                spawn_x = self.x - offset  # Left edge of character
             spawn_y = self.y + self.height // 2  # Middle height of character
             return Rainbow(spawn_x, spawn_y, direction)
         return None
