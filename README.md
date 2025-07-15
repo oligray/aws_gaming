@@ -49,9 +49,9 @@ python rainbow_islands_game.py
 
 ## Game Elements
 
-- **Blue Character**: The player (you!)
-- **Green Platforms**: Static platforms you can jump on
-- **Red Enemies**: Avoid these or defeat them with rainbows
+- **Orange Character**: The player (you!)
+- **Red Platforms**: Static platforms you can jump on
+- **Blue Enemies**: Avoid these or defeat them with rainbows
 - **Rainbow Bridges**: Temporary platforms created by your rainbow shots
 - **Colorful Rainbows**: Your projectiles that defeat enemies and create bridges
 

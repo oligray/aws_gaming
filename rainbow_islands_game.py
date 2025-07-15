@@ -23,6 +23,7 @@ PURPLE = (255, 0, 255)
 ORANGE = (255, 165, 0)
 CYAN = (0, 255, 255)
 PINK = (255, 192, 203)
+GREY = (120, 120, 120)
 
 # Rainbow colors for the rainbow bridges
 RAINBOW_COLORS = [RED, ORANGE, YELLOW, GREEN, CYAN, BLUE, PURPLE]
@@ -187,7 +188,7 @@ class Player:
     
     def draw(self, screen):
         # Draw player as a simple colored rectangle
-        color = BLUE if self.facing_right else CYAN
+        color = ORANGE #if self.facing_right else CYAN
         pygame.draw.rect(screen, color, (self.x, self.y, self.width, self.height))
         # Draw eyes
         eye_size = 4
@@ -312,7 +313,7 @@ class Enemy:
             
     def draw(self, screen):
         if self.alive:
-            pygame.draw.rect(screen, RED, (self.x, self.y, self.width, self.height))
+            pygame.draw.rect(screen, BLUE, (self.x, self.y, self.width, self.height))
             # Draw simple face
             pygame.draw.circle(screen, WHITE, (int(self.x + 8), int(self.y + 8)), 3)
             pygame.draw.circle(screen, WHITE, (int(self.x + 16), int(self.y + 8)), 3)
@@ -585,7 +586,7 @@ class Game:
             "Create rainbow bridges to reach higher platforms!"
         ]
         for i, instruction in enumerate(instructions):
-            text = font_small.render(instruction, True, BLUE)
+            text = font_small.render(instruction, True, GREY)
             self.screen.blit(text, (400, SCREEN_HEIGHT - 175 + i * 25))
         
         if self.state == GameState.GAME_OVER:
