@@ -41,7 +41,7 @@ class Player:
         self.vel_x = 0
         self.vel_y = 0
         self.speed = 5
-        self.jump_power = -12
+        self.jump_power = -10
         self.gravity = 0.5
         self.on_ground = False
         self.facing_right = True
@@ -180,7 +180,7 @@ class Player:
                 spawn_x = self.x + self.width + offset  # Right edge of character
             else:
                 spawn_x = self.x - offset  # Left edge of character
-            spawn_y = self.y + self.height // 2  # Middle height of character
+            spawn_y = self.y + self.height + 2
             return Rainbow(spawn_x, spawn_y, direction)
         return None
     
@@ -409,11 +409,9 @@ class Game:
             Platform(80, 250, 160, 20),     # Left side
         ])
         
-        # Top platforms (longest, mostly from edges) - increased gap from 120 to 120, and top from 50 to 80
+        # Top platform (moved down, removed the two beneath it)
         platforms.extend([
-            Platform(0, 120, 350, 20),      # Very long from left edge
-            Platform(450, 100, 350, 20),    # Very long from right edge (extends to screen edge)
-            Platform(0, 40, 800, 20),       # Full screen width platform (moved up for bigger gap)
+            Platform(0, 120, 800, 20),      # Full screen width platform (moved down from Y=40)
         ])
         
         return platforms
@@ -430,9 +428,7 @@ class Game:
             
             # Top level enemies (kept all - these are on longer platforms)
             Enemy(200, 96, 0, 350),         # On very long left platform (Y=120-20-4=96)
-            Enemy(600, 76, 450, 800),       # On very long right platform (Y=100-20-4=76)
-            Enemy(150, 16, 0, 800),         # On full-width top platform (Y=40-20-4=16)
-            Enemy(650, 16, 0, 800),         # On full-width top platform (Y=40-20-4=16)
+            Enemy(600, 96, 450, 800),       # On very long right platform (Y=100-20-4=76)
         ]
         return enemies
         
