@@ -398,24 +398,8 @@ class Game:
             if jumped_rainbow is False:  # Player died
                 self.state = GameState.GAME_OVER
             elif jumped_rainbow is not True:  # Player jumped on a rainbow (returned Rainbow object)
-                # Dissolve the rainbow
+                # Dissolve the rainbow (monster killing will happen during fall)
                 jumped_rainbow.dissolve()
-                # Kill any monsters underneath the rainbow arc
-                arc_height = 20
-                for enemy in self.enemies:
-                    if enemy.alive:
-                        enemy_center_x = enemy.x + enemy.width // 2
-                        # Check if enemy is horizontally within the rainbow bridge
-                        if jumped_rainbow.x <= enemy_center_x <= jumped_rainbow.x + jumped_rainbow.bridge_width:
-                            # Calculate the arc height at the enemy's position
-                            x_progress = (enemy_center_x - jumped_rainbow.x) / jumped_rainbow.bridge_width
-                            arc_y_offset = arc_height * math.sin(x_progress * math.pi)
-                            rainbow_bottom_y = jumped_rainbow.y - arc_y_offset + jumped_rainbow.bridge_height
-                            
-                            # Check if enemy is underneath the rainbow at this position
-                            if enemy.y >= rainbow_bottom_y:
-                                enemy.alive = False
-                                self.score += 100  # Award points for killing enemy
                 
             # Update enemies
             for enemy in self.enemies:
@@ -432,7 +416,20 @@ class Game:
             # Update rainbows
             self.rainbows = [rainbow for rainbow in self.rainbows if rainbow.update()]
             
-            # Check rainbow-enemy collisions
+            # Check falling rainbow-enemy collisions (when rainbows are dissolving)
+            for rainbow in self.rainbows:
+                if rainbow.dissolving:
+                    # Create collision rect for the falling rainbow
+                    rainbow_rect = pygame.Rect(rainbow.x, rainbow.y, rainbow.bridge_width, rainbow.bridge_height)
+                    for enemy in self.enemies:
+                        if enemy.alive:
+                            enemy_rect = pygame.Rect(enemy.x, enemy.y, enemy.width, enemy.height)
+                            if rainbow_rect.colliderect(enemy_rect):
+                                enemy.alive = False
+                                self.score += 100
+                                print(f"Falling rainbow killed enemy! Score: {self.score}")  # Debug message
+            
+            # Check rainbow-enemy collisions (projectile phase)
             for rainbow in self.rainbows:
                 if not rainbow.solid:  # Only projectile rainbows can kill enemies
                     # Create a larger collision rect for the rainbow projectile
