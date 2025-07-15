@@ -249,6 +249,7 @@ class Rainbow:
         self.bridge_height = 12  # Height of the rainbow bridge
         self.dissolving = False
         self.dissolve_timer = 0
+        self.dissolve_fall_speed = 2  # Pixels per frame to fall during dissolution
         
     def dissolve(self):
         """Start the dissolution process"""
@@ -262,7 +263,9 @@ class Rainbow:
         # Handle dissolution
         if self.dissolving:
             self.dissolve_timer += 1
-            if self.dissolve_timer > 30:  # Dissolve over 30 frames (0.5 seconds)
+            # Move rainbow down during dissolution
+            self.y += self.dissolve_fall_speed
+            if self.dissolve_timer > 120:  # Dissolve over 120 frames (2 seconds at 60 FPS)
                 return False
             return True
             
@@ -293,8 +296,8 @@ class Rainbow:
             # Draw as a solid rainbow bridge in an arc shape
             alpha = 255
             if self.dissolving:
-                # Fade out during dissolution
-                alpha = max(0, 255 - (self.dissolve_timer * 8))
+                # Fade out during dissolution over 2 seconds (120 frames)
+                alpha = max(0, 255 - (self.dissolve_timer * 255 // 120))
             
             # Draw rainbow as an arc (hill shape)
             arc_height = 20  # Height of the arc at the center
@@ -431,14 +434,16 @@ class Game:
             
             # Check rainbow-enemy collisions
             for rainbow in self.rainbows:
-                if not rainbow.solid:
-                    rainbow_rect = pygame.Rect(rainbow.x - 4, rainbow.y - 4, 8, 8)
+                if not rainbow.solid:  # Only projectile rainbows can kill enemies
+                    # Create a larger collision rect for the rainbow projectile
+                    rainbow_rect = pygame.Rect(rainbow.x - 8, rainbow.y - 8, 16, 16)
                     for enemy in self.enemies:
                         if enemy.alive:
                             enemy_rect = pygame.Rect(enemy.x, enemy.y, enemy.width, enemy.height)
                             if rainbow_rect.colliderect(enemy_rect):
                                 enemy.alive = False
                                 self.score += 100
+                                print(f"Rainbow projectile killed enemy! Score: {self.score}")  # Debug message
                                 
             # Check if all enemies defeated
             if all(not enemy.alive for enemy in self.enemies):
