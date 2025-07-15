@@ -429,6 +429,7 @@ class Game:
         self.player = Player(100, 500)
         self.platforms = self.create_level()
         self.enemies = self.create_enemies()
+        # self.trophy = self.create_trophy()
         self.rainbows = []
         self.score = 0
         self.level = 1
@@ -474,6 +475,11 @@ class Game:
         ]
         return enemies
         
+    def create_trophy(self):
+        trophy = WinnersCup(650, 20)
+        #trophy.draw()
+        return trophy
+
     def handle_events(self):
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
