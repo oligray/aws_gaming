@@ -508,7 +508,7 @@ class Game:
                 self.state = GameState.LEVEL_COMPLETE
                 
     def draw(self):
-        self.screen.fill(WHITE)
+        self.screen.fill((134, 206, 250))  # Light blue background #86CEFA
         
         # Draw platforms
         for platform in self.platforms:
