@@ -382,33 +382,47 @@ class Game:
         self.level = 1
         
     def create_level(self):
-        platforms = [
-            # Ground platforms
-            Platform(0, 580, 200, 20),
-            Platform(300, 580, 200, 20),
-            Platform(600, 580, 200, 20),
-            
-            # Mid-level platforms
-            Platform(150, 450, 150, 20),
-            Platform(400, 400, 150, 20),
-            Platform(50, 320, 150, 20),
-            Platform(600, 350, 150, 20),
-            
-            # Upper platforms
-            Platform(250, 250, 150, 20),
-            Platform(450, 200, 150, 20),
-            Platform(100, 150, 150, 20),
-            Platform(550, 100, 150, 20),
-        ]
+        platforms = []
+        
+        # Ground level platforms (shorter, scattered)
+        platforms.extend([
+            Platform(0, 580, 180, 20),      # Left edge
+            Platform(320, 580, 160, 20),    # Center
+            Platform(620, 580, 180, 20),    # Right edge (extends to screen edge)
+        ])
+        
+        # Mid platforms (medium length, some from edges) - increased gap from 450 to 380
+        platforms.extend([
+            Platform(0, 380, 220, 20),      # From left edge
+            Platform(400, 330, 140, 20),    # Center short
+            Platform(580, 280, 220, 20),    # From right edge (extends to screen edge)
+            Platform(80, 250, 160, 20),     # Left side
+        ])
+        
+        # Top platforms (longest, mostly from edges) - increased gap from 120 to 120, and top from 50 to 80
+        platforms.extend([
+            Platform(0, 120, 350, 20),      # Very long from left edge
+            Platform(450, 100, 350, 20),    # Very long from right edge (extends to screen edge)
+            Platform(0, 40, 800, 20),       # Full screen width platform (moved up for bigger gap)
+        ])
+        
         return platforms
         
     def create_enemies(self):
         enemies = [
-            Enemy(320, 556, 300, 500),
-            Enemy(170, 426, 150, 300),
-            Enemy(420, 376, 400, 550),
-            Enemy(70, 296, 50, 200),
-            Enemy(620, 326, 600, 750),
+            # Ground level enemies (removed enemy from spawn platform and center platform)
+            Enemy(650, 556, 620, 800),      # On right ground platform only
+            
+            # Mid-level enemies (removed enemy from shortest center platform)
+            Enemy(100, 356, 0, 220),        # On left-edge platform (Y=380-20-4=356)
+            Enemy(650, 256, 580, 800),      # On right-edge platform (Y=280-20-4=256)
+            Enemy(120, 226, 80, 240),       # On left-side platform (Y=250-20-4=226)
+            
+            # Top level enemies (kept all - these are on longer platforms)
+            Enemy(200, 96, 0, 350),         # On very long left platform (Y=120-20-4=96)
+            Enemy(600, 76, 450, 800),       # On very long right platform (Y=100-20-4=76)
+            Enemy(150, 16, 0, 800),         # On full-width top platform (Y=40-20-4=16)
+            Enemy(650, 16, 0, 800),         # On full-width top platform (Y=40-20-4=16)
         ]
         return enemies
         
