@@ -112,9 +112,7 @@ class Player:
                     
         # Check rainbow collisions (rainbows act as platforms)
         jumped_on_rainbow = None
-        valid_rainbows = []
         
-        # First, find all rainbows the player could potentially land on
         for rainbow in rainbows:
             if rainbow.solid and not rainbow.dissolving:
                 player_center_x = self.x + self.width // 2
@@ -127,25 +125,37 @@ class Player:
                     arc_y_offset = arc_height * math.sin(x_progress * math.pi)
                     rainbow_top_y = rainbow.y - arc_y_offset
                     
-                    # Only consider rainbows that are below the player
-                    if (self.vel_y > 0 and  # Player is falling
-                        self.y < rainbow_top_y and  # Player is above the rainbow
-                        self.y + self.height > rainbow_top_y - 15):  # Player is close enough
+                    # Create collision rect for the rainbow at this position
+                    rainbow_rect = pygame.Rect(player_center_x - 10, rainbow_top_y, 20, rainbow.bridge_height)
+                    player_rect = pygame.Rect(self.x, self.y, self.width, self.height)
+                    
+                    # Check for collision with the rainbow
+                    if player_rect.colliderect(rainbow_rect):
+                        # Only dissolve on high-velocity landing (jumping onto rainbow)
+                        if self.vel_y > 5 and self.y < rainbow_top_y:
+                            jumped_on_rainbow = rainbow
                         
-                        valid_rainbows.append((rainbow, rainbow_top_y))
-        
-        # Sort by Y position (topmost first) and take the highest rainbow
-        if valid_rainbows:
-            valid_rainbows.sort(key=lambda x: x[1])  # Sort by rainbow_top_y
-            rainbow, rainbow_top_y = valid_rainbows[0]  # Take the topmost rainbow
-            
-            # Check if player jumped onto the rainbow
-            if self.vel_y > 5:  # Player was falling fast (jumped)
-                jumped_on_rainbow = rainbow
-            
-            self.y = rainbow_top_y - self.height
-            self.vel_y = 0
-            self.on_ground = True
+                        # Handle collision based on direction
+                        if self.vel_y > 0 and self.y < rainbow_top_y:
+                            # Landing on top - normal platform behavior
+                            self.y = rainbow_top_y - self.height
+                            self.vel_y = 0
+                            self.on_ground = True
+                        elif self.vel_y < 0 and self.y > rainbow_top_y + rainbow.bridge_height:
+                            # Hitting from below - dissolve rainbow
+                            jumped_on_rainbow = rainbow
+                            self.y = rainbow_top_y + rainbow.bridge_height + 2
+                            self.vel_y = 2  # Small downward velocity
+                        elif self.vel_x > 0:
+                            # Hitting from left side
+                            self.x = rainbow.x - self.width
+                            self.vel_x = 0
+                        elif self.vel_x < 0:
+                            # Hitting from right side  
+                            self.x = rainbow.x + rainbow.bridge_width
+                            self.vel_x = 0
+                        
+                        break  # Only collide with one rainbow at a time
         
         # Keep player on screen
         if self.x < 0:
