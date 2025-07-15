@@ -195,7 +195,44 @@ class Platform:
         self.height = height
         
     def draw(self, screen):
-        pygame.draw.rect(screen, GREEN, (self.x, self.y, self.width, self.height))
+        # Draw brick pattern
+        brick_width = 32
+        brick_height = 16
+        
+        # Fill background with base red brick color
+        pygame.draw.rect(screen, (139, 35, 35), (self.x, self.y, self.width, self.height))  # Dark red base
+        
+        # Draw individual bricks
+        for row in range(0, self.height, brick_height):
+            for col in range(0, self.width, brick_width):
+                # Offset every other row for brick pattern
+                offset = (brick_width // 2) if (row // brick_height) % 2 == 1 else 0
+                brick_x = self.x + col + offset
+                brick_y = self.y + row
+                
+                # Only draw brick if it fits within the platform
+                if brick_x < self.x + self.width and brick_y < self.y + self.height:
+                    # Calculate actual brick dimensions (may be clipped)
+                    actual_width = min(brick_width, self.x + self.width - brick_x)
+                    actual_height = min(brick_height, self.y + self.height - brick_y)
+                    
+                    if actual_width > 0 and actual_height > 0:
+                        # Draw brick with gradient effect
+                        # Red brick color
+                        pygame.draw.rect(screen, (178, 34, 34), (brick_x, brick_y, actual_width, actual_height))
+                        
+                        # Highlight on top and left (3D effect)
+                        pygame.draw.line(screen, (220, 80, 80), (brick_x, brick_y), (brick_x + actual_width - 1, brick_y), 2)
+                        pygame.draw.line(screen, (220, 80, 80), (brick_x, brick_y), (brick_x, brick_y + actual_height - 1), 2)
+                        
+                        # Shadow on bottom and right (3D effect)
+                        pygame.draw.line(screen, (100, 20, 20), (brick_x, brick_y + actual_height - 1), (brick_x + actual_width - 1, brick_y + actual_height - 1), 2)
+                        pygame.draw.line(screen, (100, 20, 20), (brick_x + actual_width - 1, brick_y), (brick_x + actual_width - 1, brick_y + actual_height - 1), 2)
+                        
+                        # Dark outline for each brick
+                        pygame.draw.rect(screen, (80, 15, 15), (brick_x, brick_y, actual_width, actual_height), 1)
+        
+        # Draw overall platform border
         pygame.draw.rect(screen, BLACK, (self.x, self.y, self.width, self.height), 2)
 
 class Enemy:
