@@ -31,6 +31,7 @@ class GameState(Enum):
     PLAYING = 1
     GAME_OVER = 2
     LEVEL_COMPLETE = 3
+    WIN = 4
 
 class Player:
     def __init__(self, x, y):
@@ -180,7 +181,7 @@ class Player:
                 spawn_x = self.x + self.width + offset  # Right edge of character
             else:
                 spawn_x = self.x - offset  # Left edge of character
-            spawn_y = self.y + self.height + 2
+            spawn_y = self.y + self.height - 2
             return Rainbow(spawn_x, spawn_y, direction)
         return None
     
@@ -244,6 +245,47 @@ class Platform:
         
         # Draw overall platform border
         pygame.draw.rect(screen, BLACK, (self.x, self.y, self.width, self.height), 2)
+
+class WinnersCup:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.width = 24
+        self.height = 32
+        self.collected = False
+        self.bob_offset = 0  # For floating animation
+        
+    def update(self):
+        # Gentle bobbing animation
+        self.bob_offset = math.sin(pygame.time.get_ticks() * 0.005) * 3
+        
+    def draw(self, screen):
+        if not self.collected:
+            # Draw trophy cup with bobbing animation
+            cup_y = self.y + self.bob_offset
+            
+            # Cup base (dark gold)
+            pygame.draw.rect(screen, (184, 134, 11), (self.x + 6, cup_y + 24, 12, 8))
+            
+            # Cup stem (gold)
+            pygame.draw.rect(screen, (255, 215, 0), (self.x + 9, cup_y + 18, 6, 6))
+            
+            # Cup bowl (bright gold)
+            pygame.draw.ellipse(screen, (255, 215, 0), (self.x + 2, cup_y + 8, 20, 12))
+            
+            # Cup handles (gold)
+            pygame.draw.arc(screen, (255, 215, 0), (self.x - 2, cup_y + 10, 8, 8), 0, math.pi, 3)
+            pygame.draw.arc(screen, (255, 215, 0), (self.x + 18, cup_y + 10, 8, 8), 0, math.pi, 3)
+            
+            # Cup top rim (bright gold)
+            pygame.draw.ellipse(screen, (255, 223, 0), (self.x + 4, cup_y + 6, 16, 6))
+            
+            # Sparkle effects
+            sparkle_time = pygame.time.get_ticks() * 0.01
+            for i in range(3):
+                sparkle_x = self.x + 8 + math.sin(sparkle_time + i * 2) * 15
+                sparkle_y = cup_y + 10 + math.cos(sparkle_time + i * 1.5) * 10
+                pygame.draw.circle(screen, (255, 255, 255), (int(sparkle_x), int(sparkle_y)), 2)
 
 class Enemy:
     def __init__(self, x, y, patrol_start, patrol_end):
@@ -347,7 +389,7 @@ class Rainbow:
                 alpha = max(0, 255 - (self.dissolve_timer * 255 // 120))
             
             # Draw rainbow as an arc (hill shape)
-            arc_height = 20  # Height of the arc at the center
+            arc_height = 25  # Height of the arc at the center
             segments = 20  # Number of segments to create smooth arc
             segment_width = self.bridge_width // segments
             
@@ -537,8 +579,8 @@ class Game:
             "Create rainbow bridges to reach higher platforms!"
         ]
         for i, instruction in enumerate(instructions):
-            text = font_small.render(instruction, True, BLACK)
-            self.screen.blit(text, (10, SCREEN_HEIGHT - 80 + i * 25))
+            text = font_small.render(instruction, True, BLUE)
+            self.screen.blit(text, (400, SCREEN_HEIGHT - 175 + i * 25))
         
         if self.state == GameState.GAME_OVER:
             # Draw game over screen
