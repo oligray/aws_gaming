@@ -288,6 +288,76 @@ class WinnersCup:
                 sparkle_y = cup_y + 10 + math.cos(sparkle_time + i * 1.5) * 10
                 pygame.draw.circle(screen, (255, 255, 255), (int(sparkle_x), int(sparkle_y)), 2)
 
+class DeadEnemy:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.start_y = y
+        self.width = 24
+        self.height = 24
+        self.vel_y = -8  # Initial upward velocity
+        self.gravity = 0.4
+        self.rotation = 0
+        self.rotation_speed = 15  # Degrees per frame
+        self.max_height = 40  # Maximum height to rise
+        self.landed = False
+        
+    def update(self):
+        if not self.landed:
+            # Apply physics
+            self.vel_y += self.gravity
+            self.y += self.vel_y
+            self.rotation += self.rotation_speed
+            
+            # Check if enemy has landed back on or below original position
+            if self.y >= self.start_y:
+                self.y = self.start_y
+                self.landed = True
+                return True  # Signal that animation is complete
+        return False
+        
+    def draw(self, screen):
+        if not self.landed:
+            # Create a surface for the rotating enemy
+            enemy_surf = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+            pygame.draw.rect(enemy_surf, BLUE, (0, 0, self.width, self.height))
+            # Draw simple face
+            pygame.draw.circle(enemy_surf, WHITE, (8, 8), 3)
+            pygame.draw.circle(enemy_surf, WHITE, (16, 8), 3)
+            pygame.draw.circle(enemy_surf, BLACK, (8, 8), 1)
+            pygame.draw.circle(enemy_surf, BLACK, (16, 8), 1)
+            
+            # Rotate the surface
+            rotated_surf = pygame.transform.rotate(enemy_surf, self.rotation)
+            
+            # Get the rect and center it on the enemy position
+            rotated_rect = rotated_surf.get_rect(center=(self.x + self.width//2, self.y + self.height//2))
+            screen.blit(rotated_surf, rotated_rect)
+
+class Fruit:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+        self.width = 16
+        self.height = 16
+        self.collected = False
+        self.bob_offset = 0
+        self.bob_speed = 0.1
+        self.color = random.choice([RED, ORANGE, YELLOW, GREEN, PURPLE])  # Random fruit color
+        
+    def update(self):
+        # Gentle bobbing animation
+        self.bob_offset = math.sin(pygame.time.get_ticks() * self.bob_speed) * 2
+        
+    def draw(self, screen):
+        if not self.collected:
+            fruit_y = self.y + self.bob_offset
+            
+            # Draw fruit as a circle with highlight
+            pygame.draw.circle(screen, self.color, (int(self.x + self.width//2), int(fruit_y + self.height//2)), 8)
+            # Add a small white highlight
+            pygame.draw.circle(screen, WHITE, (int(self.x + self.width//2 - 2), int(fruit_y + self.height//2 - 2)), 2)
+
 class Enemy:
     def __init__(self, x, y, patrol_start, patrol_end):
         self.x = x
@@ -298,12 +368,8 @@ class Enemy:
         self.direction = 1
         self.patrol_start = patrol_start
         self.patrol_end = patrol_end
-        self.alive = True
         
-    def update(self, platforms):
-        if not self.alive:
-            return
-            
+    def update(self, platforms, rainbows=None):
         # Move enemy
         self.x += self.speed * self.direction
         
@@ -311,14 +377,27 @@ class Enemy:
         if self.x <= self.patrol_start or self.x >= self.patrol_end - self.width:
             self.direction *= -1
             
+        # Check for collisions with solid rainbow bridges
+        if rainbows:
+            enemy_rect = pygame.Rect(self.x, self.y, self.width, self.height)
+            for rainbow in rainbows:
+                if rainbow.solid and not rainbow.dissolving:
+                    # Check if enemy is colliding with the rainbow bridge
+                    rainbow_rect = pygame.Rect(rainbow.x, rainbow.y - 25, rainbow.bridge_width, rainbow.bridge_height + 25)
+                    if enemy_rect.colliderect(rainbow_rect):
+                        # Turn around when touching a static rainbow
+                        self.direction *= -1
+                        # Move enemy away from the rainbow to prevent getting stuck
+                        self.x += self.speed * self.direction * 2
+                        break
+            
     def draw(self, screen):
-        if self.alive:
-            pygame.draw.rect(screen, BLUE, (self.x, self.y, self.width, self.height))
-            # Draw simple face
-            pygame.draw.circle(screen, WHITE, (int(self.x + 8), int(self.y + 8)), 3)
-            pygame.draw.circle(screen, WHITE, (int(self.x + 16), int(self.y + 8)), 3)
-            pygame.draw.circle(screen, BLACK, (int(self.x + 8), int(self.y + 8)), 1)
-            pygame.draw.circle(screen, BLACK, (int(self.x + 16), int(self.y + 8)), 1)
+        pygame.draw.rect(screen, BLUE, (self.x, self.y, self.width, self.height))
+        # Draw simple face
+        pygame.draw.circle(screen, WHITE, (int(self.x + 8), int(self.y + 8)), 3)
+        pygame.draw.circle(screen, WHITE, (int(self.x + 16), int(self.y + 8)), 3)
+        pygame.draw.circle(screen, BLACK, (int(self.x + 8), int(self.y + 8)), 1)
+        pygame.draw.circle(screen, BLACK, (int(self.x + 16), int(self.y + 8)), 1)
 
 class Rainbow:
     def __init__(self, x, y, direction):
@@ -432,6 +511,8 @@ class Game:
         self.enemies = self.create_enemies()
         # self.trophy = self.create_trophy()
         self.rainbows = []
+        self.dead_enemies = []  # For death animations
+        self.fruits = []  # For collectible fruits
         self.score = 0
         self.level = 1
         
@@ -509,16 +590,34 @@ class Game:
                 
             # Update enemies
             for enemy in self.enemies:
-                enemy.update(self.platforms)
+                enemy.update(self.platforms, self.rainbows)
                 
-            # Check player-enemy collisions
-            player_rect = pygame.Rect(self.player.x, self.player.y, self.player.width, self.player.height)
-            for enemy in self.enemies:
-                if enemy.alive:
-                    enemy_rect = pygame.Rect(enemy.x, enemy.y, enemy.width, enemy.height)
-                    if player_rect.colliderect(enemy_rect):
-                        self.state = GameState.GAME_OVER
-                        
+            # Check rainbow-enemy collisions BEFORE updating rainbows (prevents skipping over enemies)
+            rainbows_to_remove = []
+            for rainbow in self.rainbows:
+                if not rainbow.solid:  # Only projectile rainbows can kill enemies
+                    # Create a collision rect for the rainbow projectile (matches the 4-pixel radius circle)
+                    rainbow_rect = pygame.Rect(rainbow.x - 4, rainbow.y - 4, 8, 8)
+                    hit_enemy = False
+                    for enemy in self.enemies[:]:  # Use slice to avoid modification during iteration
+                        enemy_rect = pygame.Rect(enemy.x, enemy.y, enemy.width, enemy.height)
+                        if rainbow_rect.colliderect(enemy_rect):
+                            # Create death animation
+                            dead_enemy = DeadEnemy(enemy.x, enemy.y)
+                            self.dead_enemies.append(dead_enemy)
+                            # Remove enemy from active enemies
+                            self.enemies.remove(enemy)
+                            self.score += 100
+                            print(f"Rainbow projectile killed enemy! Score: {self.score}")  # Debug message
+                            rainbows_to_remove.append(rainbow)
+                            hit_enemy = True
+                            break  # Rainbow can only hit one enemy
+                                
+            # Remove rainbows that hit enemies
+            for rainbow in rainbows_to_remove:
+                if rainbow in self.rainbows:
+                    self.rainbows.remove(rainbow)
+                
             # Update rainbows
             self.rainbows = [rainbow for rainbow in self.rainbows if rainbow.update()]
             
@@ -527,29 +626,53 @@ class Game:
                 if rainbow.dissolving:
                     # Create collision rect for the falling rainbow
                     rainbow_rect = pygame.Rect(rainbow.x, rainbow.y, rainbow.bridge_width, rainbow.bridge_height)
-                    for enemy in self.enemies:
-                        if enemy.alive:
-                            enemy_rect = pygame.Rect(enemy.x, enemy.y, enemy.width, enemy.height)
-                            if rainbow_rect.colliderect(enemy_rect):
-                                enemy.alive = False
-                                self.score += 100
-                                print(f"Falling rainbow killed enemy! Score: {self.score}")  # Debug message
-            
-            # Check rainbow-enemy collisions (projectile phase)
-            for rainbow in self.rainbows:
-                if not rainbow.solid:  # Only projectile rainbows can kill enemies
-                    # Create a larger collision rect for the rainbow projectile
-                    rainbow_rect = pygame.Rect(rainbow.x - 8, rainbow.y - 8, 16, 16)
-                    for enemy in self.enemies:
-                        if enemy.alive:
-                            enemy_rect = pygame.Rect(enemy.x, enemy.y, enemy.width, enemy.height)
-                            if rainbow_rect.colliderect(enemy_rect):
-                                enemy.alive = False
-                                self.score += 100
-                                print(f"Rainbow projectile killed enemy! Score: {self.score}")  # Debug message
+                    for enemy in self.enemies[:]:  # Use slice to avoid modification during iteration
+                        enemy_rect = pygame.Rect(enemy.x, enemy.y, enemy.width, enemy.height)
+                        if rainbow_rect.colliderect(enemy_rect):
+                            # Create death animation
+                            dead_enemy = DeadEnemy(enemy.x, enemy.y)
+                            self.dead_enemies.append(dead_enemy)
+                            # Remove enemy from active enemies
+                            self.enemies.remove(enemy)
+                            self.score += 100
+                            print(f"Falling rainbow killed enemy! Score: {self.score}")  # Debug message
                                 
-            # Check if all enemies defeated
-            if all(not enemy.alive for enemy in self.enemies):
+            # Check player-enemy collisions
+            player_rect = pygame.Rect(self.player.x, self.player.y, self.player.width, self.player.height)
+            for enemy in self.enemies:
+                enemy_rect = pygame.Rect(enemy.x, enemy.y, enemy.width, enemy.height)
+                if player_rect.colliderect(enemy_rect):
+                    self.state = GameState.GAME_OVER
+                    
+            # Update dead enemies and create fruits when they land
+            dead_enemies_to_remove = []
+            for dead_enemy in self.dead_enemies:
+                if dead_enemy.update():  # Returns True when animation is complete
+                    # Create fruit at the dead enemy's position
+                    fruit = Fruit(dead_enemy.x + 4, dead_enemy.y + 4)  # Center fruit on enemy position
+                    self.fruits.append(fruit)
+                    dead_enemies_to_remove.append(dead_enemy)
+                    
+            # Remove completed death animations
+            for dead_enemy in dead_enemies_to_remove:
+                self.dead_enemies.remove(dead_enemy)
+                
+            # Update fruits
+            for fruit in self.fruits:
+                fruit.update()
+                
+            # Check player-fruit collisions
+            for fruit in self.fruits[:]:  # Use slice to avoid modification during iteration
+                if not fruit.collected:
+                    fruit_rect = pygame.Rect(fruit.x, fruit.y, fruit.width, fruit.height)
+                    if player_rect.colliderect(fruit_rect):
+                        fruit.collected = True
+                        self.fruits.remove(fruit)
+                        self.score += 20
+                        print(f"Collected fruit! Score: {self.score}")  # Debug message
+                                
+            # Check if all enemies defeated (including those in death animation)
+            if len(self.enemies) == 0 and len(self.dead_enemies) == 0:
                 self.state = GameState.LEVEL_COMPLETE
                 
     def draw(self):
@@ -562,6 +685,14 @@ class Game:
         # Draw enemies
         for enemy in self.enemies:
             enemy.draw(self.screen)
+            
+        # Draw dead enemies (death animations)
+        for dead_enemy in self.dead_enemies:
+            dead_enemy.draw(self.screen)
+            
+        # Draw fruits
+        for fruit in self.fruits:
+            fruit.draw(self.screen)
             
         # Draw rainbows
         for rainbow in self.rainbows:
@@ -583,11 +714,12 @@ class Game:
         instructions = [
             "Arrow Keys / WASD: Move and Jump",
             "X / Left Ctrl: Shoot Rainbow",
+            "Defeat enemies to create fruit (20 points each)!",
             "Create rainbow bridges to reach higher platforms!"
         ]
         for i, instruction in enumerate(instructions):
             text = font_small.render(instruction, True, GREY)
-            self.screen.blit(text, (400, SCREEN_HEIGHT - 175 + i * 25))
+            self.screen.blit(text, (400, SCREEN_HEIGHT - 200 + i * 25))
         
         if self.state == GameState.GAME_OVER:
             # Draw game over screen
