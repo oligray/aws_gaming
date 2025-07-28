@@ -621,6 +621,27 @@ class Game:
             # Update rainbows
             self.rainbows = [rainbow for rainbow in self.rainbows if rainbow.update()]
             
+            # Check for falling rainbow collisions (chain reaction)
+            newly_triggered = []  # Track rainbows that were just triggered this frame
+            for i, rainbow1 in enumerate(self.rainbows):
+                if rainbow1.dissolving and rainbow1.dissolve_timer > 1:  # Only after first frame of dissolution
+                    rainbow1_rect = pygame.Rect(rainbow1.x, rainbow1.y, rainbow1.bridge_width, rainbow1.bridge_height)
+                    for j, rainbow2 in enumerate(self.rainbows):
+                        if (i != j and rainbow2.solid and not rainbow2.dissolving and 
+                            rainbow2 not in newly_triggered):  # Different rainbow that's solid, not falling, and not already triggered this frame
+                            
+                            # More precise collision detection - check if rainbows actually overlap
+                            rainbow2_rect = pygame.Rect(rainbow2.x, rainbow2.y, rainbow2.bridge_width, rainbow2.bridge_height)
+                            
+                            # Check for actual overlap (not just touching edges)
+                            if (rainbow1_rect.colliderect(rainbow2_rect) and 
+                                abs(rainbow1.y - rainbow2.y) < rainbow1.bridge_height):  # Vertical overlap check
+                                
+                                # Trigger chain reaction - make the second rainbow start falling
+                                if rainbow2.dissolve():  # Only trigger if dissolve() returns True (wasn't already dissolving)
+                                    newly_triggered.append(rainbow2)
+                                    print(f"Chain reaction! Falling rainbow triggered another rainbow to fall!")  # Debug message
+            
             # Check falling rainbow-enemy collisions (when rainbows are dissolving)
             for rainbow in self.rainbows:
                 if rainbow.dissolving:
