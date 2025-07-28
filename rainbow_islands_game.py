@@ -43,7 +43,7 @@ class Player:
         self.vel_x = 0
         self.vel_y = 0
         self.speed = 5
-        self.jump_power = -10
+        self.jump_power = -8
         self.gravity = 0.5
         self.on_ground = False
         self.facing_right = True
@@ -692,8 +692,8 @@ class Game:
                         self.score += 20
                         print(f"Collected fruit! Score: {self.score}")  # Debug message
                                 
-            # Check if all enemies defeated (including those in death animation)
-            if len(self.enemies) == 0 and len(self.dead_enemies) == 0:
+            # Check if level is complete - all enemies defeated AND all fruit collected
+            if len(self.enemies) == 0 and len(self.dead_enemies) == 0 and len(self.fruits) == 0:
                 self.state = GameState.LEVEL_COMPLETE
                 
     def draw(self):
