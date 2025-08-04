@@ -377,19 +377,20 @@ class Enemy:
         if self.x <= self.patrol_start or self.x >= self.patrol_end - self.width:
             self.direction *= -1
             
-        # Check for collisions with solid rainbow bridges
+        # Check for collisions with solid rainbow bridges (enemies should turn around, not be pushed)
         if rainbows:
             enemy_rect = pygame.Rect(self.x, self.y, self.width, self.height)
             for rainbow in rainbows:
+                # Only turn around when touching solid, non-dissolving rainbows
+                # Dissolving rainbows should kill the enemy, not affect movement
                 if rainbow.solid and not rainbow.dissolving:
-                    # Check if enemy is colliding with the rainbow bridge
-                    rainbow_rect = pygame.Rect(rainbow.x, rainbow.y - 25, rainbow.bridge_width, rainbow.bridge_height + 25)
+                    # Create collision detection for rainbow bridges
+                    rainbow_rect = pygame.Rect(rainbow.x, rainbow.y - 20, rainbow.bridge_width, rainbow.bridge_height + 20)
+                    
                     if enemy_rect.colliderect(rainbow_rect):
-                        # Turn around when touching a static rainbow
+                        # Simply turn around when touching a solid rainbow bridge
                         self.direction *= -1
-                        # Move enemy away from the rainbow to prevent getting stuck
-                        self.x += self.speed * self.direction * 2
-                        break
+                        break  # Only handle collision with one rainbow at a time
             
     def draw(self, screen):
         pygame.draw.rect(screen, BLUE, (self.x, self.y, self.width, self.height))
@@ -588,11 +589,7 @@ class Game:
                 # Dissolve the rainbow (monster killing will happen during fall)
                 jumped_rainbow.dissolve()
                 
-            # Update enemies
-            for enemy in self.enemies:
-                enemy.update(self.platforms, self.rainbows)
-                
-            # Check rainbow-enemy collisions BEFORE updating rainbows (prevents skipping over enemies)
+            # Check rainbow projectile-enemy collisions FIRST (before rainbows can become solid)
             rainbows_to_remove = []
             for rainbow in self.rainbows:
                 if not rainbow.solid:  # Only projectile rainbows can kill enemies
@@ -618,9 +615,36 @@ class Game:
                 if rainbow in self.rainbows:
                     self.rainbows.remove(rainbow)
                 
-            # Update rainbows
+            # Update rainbows AFTER projectile collision check (so dissolving rainbows start falling)
             self.rainbows = [rainbow for rainbow in self.rainbows if rainbow.update()]
             
+            # Check falling rainbow-enemy collisions BEFORE enemy movement (so enemies get killed instead of pushed)
+            enemies_to_remove = []  # Track enemies to remove to avoid modification during iteration
+            for rainbow in self.rainbows:
+                if rainbow.dissolving:
+                    # Create collision rect for the falling rainbow
+                    rainbow_rect = pygame.Rect(rainbow.x, rainbow.y, rainbow.bridge_width, rainbow.bridge_height)
+                    for enemy in self.enemies:
+                        if enemy not in enemies_to_remove:  # Don't check enemies already marked for removal
+                            enemy_rect = pygame.Rect(enemy.x, enemy.y, enemy.width, enemy.height)
+                            if rainbow_rect.colliderect(enemy_rect):
+                                # Create death animation
+                                dead_enemy = DeadEnemy(enemy.x, enemy.y)
+                                self.dead_enemies.append(dead_enemy)
+                                # Mark enemy for removal
+                                enemies_to_remove.append(enemy)
+                                self.score += 100
+                                print(f"Falling rainbow killed enemy! Score: {self.score}")  # Debug message
+                                
+            # Remove all enemies that were killed by falling rainbows
+            for enemy in enemies_to_remove:
+                if enemy in self.enemies:
+                    self.enemies.remove(enemy)
+                
+            # Update enemies AFTER falling rainbow collision check
+            for enemy in self.enemies:
+                enemy.update(self.platforms, self.rainbows)
+                
             # Check for falling rainbow collisions (chain reaction)
             newly_triggered = []  # Track rainbows that were just triggered this frame
             for i, rainbow1 in enumerate(self.rainbows):
@@ -643,20 +667,27 @@ class Game:
                                     print(f"Chain reaction! Falling rainbow triggered another rainbow to fall!")  # Debug message
             
             # Check falling rainbow-enemy collisions (when rainbows are dissolving)
+            enemies_to_remove = []  # Track enemies to remove to avoid modification during iteration
             for rainbow in self.rainbows:
                 if rainbow.dissolving:
                     # Create collision rect for the falling rainbow
                     rainbow_rect = pygame.Rect(rainbow.x, rainbow.y, rainbow.bridge_width, rainbow.bridge_height)
-                    for enemy in self.enemies[:]:  # Use slice to avoid modification during iteration
-                        enemy_rect = pygame.Rect(enemy.x, enemy.y, enemy.width, enemy.height)
-                        if rainbow_rect.colliderect(enemy_rect):
-                            # Create death animation
-                            dead_enemy = DeadEnemy(enemy.x, enemy.y)
-                            self.dead_enemies.append(dead_enemy)
-                            # Remove enemy from active enemies
-                            self.enemies.remove(enemy)
-                            self.score += 100
-                            print(f"Falling rainbow killed enemy! Score: {self.score}")  # Debug message
+                    for enemy in self.enemies:
+                        if enemy not in enemies_to_remove:  # Don't check enemies already marked for removal
+                            enemy_rect = pygame.Rect(enemy.x, enemy.y, enemy.width, enemy.height)
+                            if rainbow_rect.colliderect(enemy_rect):
+                                # Create death animation
+                                dead_enemy = DeadEnemy(enemy.x, enemy.y)
+                                self.dead_enemies.append(dead_enemy)
+                                # Mark enemy for removal
+                                enemies_to_remove.append(enemy)
+                                self.score += 100
+                                print(f"Falling rainbow killed enemy! Score: {self.score}")  # Debug message
+                                
+            # Remove all enemies that were killed by falling rainbows
+            for enemy in enemies_to_remove:
+                if enemy in self.enemies:
+                    self.enemies.remove(enemy)
                                 
             # Check player-enemy collisions
             player_rect = pygame.Rect(self.player.x, self.player.y, self.player.width, self.player.height)
