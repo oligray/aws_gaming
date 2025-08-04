@@ -369,9 +369,21 @@ class Enemy:
         self.patrol_start = patrol_start
         self.patrol_end = patrol_end
         
+        # Animation properties
+        self.animation_frame = 0
+        self.animation_speed = 8  # Frames between animation updates (slower = less frequent updates)
+        self.frame_counter = 0
+        self.total_frames = 4  # Number of animation frames
+        
     def update(self, platforms, rainbows=None):
         # Move enemy
         self.x += self.speed * self.direction
+        
+        # Update animation
+        self.frame_counter += 1
+        if self.frame_counter >= self.animation_speed:
+            self.frame_counter = 0
+            self.animation_frame = (self.animation_frame + 1) % self.total_frames
         
         # Reverse direction at patrol boundaries
         if self.x <= self.patrol_start or self.x >= self.patrol_end - self.width:
@@ -393,12 +405,40 @@ class Enemy:
                         break  # Only handle collision with one rainbow at a time
             
     def draw(self, screen):
-        pygame.draw.rect(screen, BLUE, (self.x, self.y, self.width, self.height))
-        # Draw simple face
-        pygame.draw.circle(screen, WHITE, (int(self.x + 8), int(self.y + 8)), 3)
-        pygame.draw.circle(screen, WHITE, (int(self.x + 16), int(self.y + 8)), 3)
-        pygame.draw.circle(screen, BLACK, (int(self.x + 8), int(self.y + 8)), 1)
-        pygame.draw.circle(screen, BLACK, (int(self.x + 16), int(self.y + 8)), 1)
+        # Create animated sprite by drawing different patterns based on animation frame
+        base_color = BLUE
+        
+        # Main body
+        pygame.draw.rect(screen, base_color, (self.x, self.y, self.width, self.height))
+        
+        # Eyes that look in the direction of movement
+        pygame.draw.circle(screen, WHITE, (int(self.x + 6), int(self.y + 8)), 3)
+        pygame.draw.circle(screen, WHITE, (int(self.x + 18), int(self.y + 8)), 3)
+        
+        # Pupils follow movement direction
+        if self.direction > 0:  # Moving right
+            pygame.draw.circle(screen, BLACK, (int(self.x + 7), int(self.y + 8)), 1)  # Right pupil
+            pygame.draw.circle(screen, BLACK, (int(self.x + 19), int(self.y + 8)), 1)  # Right pupil
+        else:  # Moving left
+            pygame.draw.circle(screen, BLACK, (int(self.x + 5), int(self.y + 8)), 1)  # Left pupil
+            pygame.draw.circle(screen, BLACK, (int(self.x + 17), int(self.y + 8)), 1)  # Left pupil
+        
+        # Animated mouth expressions based on current frame
+        if self.animation_frame == 0:
+            # Frame 0: Small curved mouth
+            pygame.draw.arc(screen, BLACK, (self.x + 8, self.y + 14, 8, 6), 0, math.pi, 2)
+            
+        elif self.animation_frame == 1:
+            # Frame 1: Slightly open mouth
+            pygame.draw.ellipse(screen, BLACK, (self.x + 10, self.y + 15, 4, 3))
+            
+        elif self.animation_frame == 2:
+            # Frame 2: Open mouth
+            pygame.draw.ellipse(screen, BLACK, (self.x + 9, self.y + 14, 6, 4))
+            
+        else:  # Frame 3
+            # Frame 3: Closed mouth (line)
+            pygame.draw.line(screen, BLACK, (self.x + 10, self.y + 16), (self.x + 14, self.y + 16), 2)
 
 class Rainbow:
     def __init__(self, x, y, direction):
