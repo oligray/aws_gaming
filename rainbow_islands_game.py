@@ -49,6 +49,21 @@ class Player:
         self.facing_right = True
         self.rainbow_cooldown = 0
         
+        # Try to load player sprite image
+        self.sprite_image = None
+        self.sprite_image_flipped = None
+        try:
+            # Try to load player sprite (you can replace 'player.png' with your image filename)
+            self.sprite_image = pygame.image.load('player.png').convert_alpha()
+            # Scale the image to match player dimensions
+            self.sprite_image = pygame.transform.scale(self.sprite_image, (self.width, self.height))
+            # Create flipped version for left-facing direction
+            self.sprite_image_flipped = pygame.transform.flip(self.sprite_image, True, False)
+            print("Player sprite loaded successfully!")
+        except (pygame.error, FileNotFoundError):
+            print("Player sprite not found, using drawn sprite instead")
+            self.sprite_image = None
+        
     def update(self, platforms, rainbows):
         # Handle input
         keys = pygame.key.get_pressed()
@@ -187,17 +202,24 @@ class Player:
         return None
     
     def draw(self, screen):
-        # Draw player as a simple colored rectangle
-        color = ORANGE #if self.facing_right else CYAN
-        pygame.draw.rect(screen, color, (self.x, self.y, self.width, self.height))
-        # Draw eyes
-        eye_size = 4
-        if self.facing_right:
-            pygame.draw.circle(screen, WHITE, (int(self.x + 20), int(self.y + 10)), eye_size)
-            pygame.draw.circle(screen, BLACK, (int(self.x + 22), int(self.y + 10)), 2)
+        if self.sprite_image:
+            # Use image sprite
+            if self.facing_right:
+                screen.blit(self.sprite_image, (self.x, self.y))
+            else:
+                screen.blit(self.sprite_image_flipped, (self.x, self.y))
         else:
-            pygame.draw.circle(screen, WHITE, (int(self.x + 12), int(self.y + 10)), eye_size)
-            pygame.draw.circle(screen, BLACK, (int(self.x + 10), int(self.y + 10)), 2)
+            # Fallback to drawn sprite
+            color = ORANGE
+            pygame.draw.rect(screen, color, (self.x, self.y, self.width, self.height))
+            # Draw eyes
+            eye_size = 4
+            if self.facing_right:
+                pygame.draw.circle(screen, WHITE, (int(self.x + 20), int(self.y + 10)), eye_size)
+                pygame.draw.circle(screen, BLACK, (int(self.x + 22), int(self.y + 10)), 2)
+            else:
+                pygame.draw.circle(screen, WHITE, (int(self.x + 12), int(self.y + 10)), eye_size)
+                pygame.draw.circle(screen, BLACK, (int(self.x + 10), int(self.y + 10)), 2)
 
 class Platform:
     def __init__(self, x, y, width, height):
