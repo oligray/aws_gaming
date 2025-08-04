@@ -408,8 +408,8 @@ class Enemy:
         # Create animated sprite by drawing different patterns based on animation frame
         base_color = BLUE
         
-        # Main body
-        pygame.draw.rect(screen, base_color, (self.x, self.y, self.width, self.height))
+        # Main body with rounded corners
+        pygame.draw.rect(screen, base_color, (self.x, self.y, self.width, self.height), border_radius=6)
         
         # Eyes that look in the direction of movement
         pygame.draw.circle(screen, WHITE, (int(self.x + 6), int(self.y + 8)), 3)
@@ -770,6 +770,18 @@ class Game:
     def draw(self):
         self.screen.fill((134, 206, 250))  # Light blue background #86CEFA
         
+        # Draw instructions FIRST (behind everything else)
+        font_small = pygame.font.Font(None, 24)
+        instructions = [
+            "Arrow Keys / WASD: Move and Jump",
+            "X / Left Ctrl: Shoot Rainbow",
+            "Defeat enemies to create fruit (20 points each)!",
+            "Create rainbow bridges to reach higher platforms!"
+        ]
+        for i, instruction in enumerate(instructions):
+            text = font_small.render(instruction, True, GREY)
+            self.screen.blit(text, (400, SCREEN_HEIGHT - 200 + i * 25))
+        
         # Draw platforms
         for platform in self.platforms:
             platform.draw(self.screen)
@@ -793,25 +805,13 @@ class Game:
         # Draw player
         self.player.draw(self.screen)
         
-        # Draw UI
+        # Draw UI (score and level - always on top)
         font = pygame.font.Font(None, 36)
         score_text = font.render(f"Score: {self.score}", True, BLACK)
         self.screen.blit(score_text, (10, 10))
         
         level_text = font.render(f"Level: {self.level}", True, BLACK)
         self.screen.blit(level_text, (10, 50))
-        
-        # Draw instructions
-        font_small = pygame.font.Font(None, 24)
-        instructions = [
-            "Arrow Keys / WASD: Move and Jump",
-            "X / Left Ctrl: Shoot Rainbow",
-            "Defeat enemies to create fruit (20 points each)!",
-            "Create rainbow bridges to reach higher platforms!"
-        ]
-        for i, instruction in enumerate(instructions):
-            text = font_small.render(instruction, True, GREY)
-            self.screen.blit(text, (400, SCREEN_HEIGHT - 200 + i * 25))
         
         if self.state == GameState.GAME_OVER:
             # Draw game over screen
