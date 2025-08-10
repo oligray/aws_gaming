@@ -19,6 +19,7 @@ BLUE = (0, 100, 255)
 GREEN = (0, 255, 0)
 RED = (255, 0, 0)
 YELLOW = (255, 255, 0)
+GOLD = (255, 215, 0)
 PURPLE = (255, 0, 255)
 ORANGE = (255, 165, 0)
 CYAN = (0, 255, 255)
@@ -568,6 +569,10 @@ class Game:
         self.clock = pygame.time.Clock()
         self.state = GameState.PLAYING
         
+        # Initialize game state
+        self.score = 0
+        self.level = 1
+        
         # Initialize game objects
         self.player = Player(100, 500)
         self.platforms = self.create_level()
@@ -576,10 +581,38 @@ class Game:
         self.rainbows = []
         self.dead_enemies = []  # For death animations
         self.fruits = []  # For collectible fruits
-        self.score = 0
-        self.level = 1
         
+    def advance_to_next_level(self):
+        """Advance to the next level, resetting game state but keeping score"""
+        self.level += 1
+        
+        # Reset player position
+        self.player = Player(100, 500)
+        
+        # Create new level layout
+        self.platforms = self.create_level()
+        self.enemies = self.create_enemies()
+        
+        # Clear game objects
+        self.rainbows = []
+        self.dead_enemies = []
+        self.fruits = []
+        
+        # Return to playing state
+        self.state = GameState.PLAYING
+        
+        print(f"Advanced to Level {self.level}!")
+
     def create_level(self):
+        if self.level == 1:
+            return self.create_level_1()
+        elif self.level == 2:
+            return self.create_level_2()
+        else:
+            # Default to level 1 if unknown level
+            return self.create_level_1()
+    
+    def create_level_1(self):
         platforms = []
         
         # Ground level platforms (shorter, scattered)
@@ -603,8 +636,61 @@ class Game:
         ])
         
         return platforms
+    
+    def create_level_2(self):
+        platforms = []
+        
+        # Level 2: More challenging vertical layout with smaller platforms
+        # Ground level - more scattered and smaller
+        platforms.extend([
+            Platform(0, 580, 120, 20),      # Left edge (smaller)
+            Platform(200, 560, 100, 20),    # Offset platform
+            Platform(380, 580, 120, 20),    # Center (smaller)
+            Platform(580, 560, 100, 20),    # Offset platform
+            Platform(700, 580, 100, 20),    # Right edge (smaller)
+        ])
+        
+        # Lower mid platforms - staggered heights
+        platforms.extend([
+            Platform(50, 480, 140, 20),     # Left low
+            Platform(300, 450, 100, 20),    # Center low
+            Platform(500, 480, 140, 20),    # Right low
+        ])
+        
+        # Upper mid platforms - more challenging jumps
+        platforms.extend([
+            Platform(0, 350, 160, 20),      # Left edge
+            Platform(240, 320, 120, 20),    # Center left
+            Platform(440, 350, 120, 20),    # Center right
+            Platform(640, 320, 160, 20),    # Right edge
+        ])
+        
+        # High platforms - requires rainbow bridges
+        platforms.extend([
+            Platform(100, 200, 140, 20),    # Left high
+            Platform(350, 180, 100, 20),    # Center high (small)
+            Platform(560, 200, 140, 20),    # Right high
+        ])
+        
+        # Top platforms - final challenge
+        platforms.extend([
+            Platform(0, 80, 200, 20),       # Left top
+            Platform(300, 60, 200, 20),     # Center top
+            Platform(600, 80, 200, 20),     # Right top
+        ])
+        
+        return platforms
         
     def create_enemies(self):
+        if self.level == 1:
+            return self.create_enemies_1()
+        elif self.level == 2:
+            return self.create_enemies_2()
+        else:
+            # Default to level 1 if unknown level
+            return self.create_enemies_1()
+    
+    def create_enemies_1(self):
         enemies = [
             # Ground level enemies (removed enemy from spawn platform and center platform)
             Enemy(650, 556, 620, 800),      # On right ground platform only
@@ -617,6 +703,36 @@ class Game:
             # Top level enemies (kept all - these are on longer platforms)
             Enemy(200, 96, 0, 350),         # On very long left platform (Y=120-20-4=96)
             Enemy(600, 96, 450, 800),       # On very long right platform (Y=100-20-4=76)
+        ]
+        return enemies
+    
+    def create_enemies_2(self):
+        enemies = [
+            # Ground level enemies - more spread out on smaller platforms
+            # Enemy removed from left ground platform (spawn area)
+            Enemy(420, 556, 380, 500),      # Center ground platform
+            Enemy(750, 556, 700, 800),      # Right ground platform
+            
+            # Lower mid enemies
+            Enemy(120, 456, 50, 190),       # Left low platform
+            Enemy(350, 426, 300, 400),      # Center low platform (small)
+            Enemy(570, 456, 500, 640),      # Right low platform
+            
+            # Upper mid enemies - more challenging
+            Enemy(80, 326, 0, 160),         # Left edge platform
+            Enemy(300, 296, 240, 360),      # Center left platform
+            Enemy(500, 326, 440, 560),      # Center right platform
+            Enemy(720, 296, 640, 800),      # Right edge platform
+            
+            # High platform enemies - requires strategy
+            Enemy(170, 176, 100, 240),      # Left high platform
+            Enemy(400, 156, 350, 450),      # Center high platform (very small!)
+            Enemy(630, 176, 560, 700),      # Right high platform
+            
+            # Top level enemies - final challenge
+            Enemy(100, 56, 0, 200),         # Left top platform
+            Enemy(400, 36, 300, 500),       # Center top platform
+            Enemy(700, 56, 600, 800),       # Right top platform
         ]
         return enemies
         
@@ -635,9 +751,15 @@ class Game:
                     rainbow = self.player.shoot_rainbow()
                     if rainbow:
                         self.rainbows.append(rainbow)
-                elif event.key == pygame.K_r and self.state == GameState.GAME_OVER:
+                elif event.key == pygame.K_r and (self.state == GameState.GAME_OVER or self.state == GameState.WIN):
                     # Restart game
                     self.__init__()
+                elif event.key == pygame.K_SPACE and self.state == GameState.LEVEL_COMPLETE:
+                    # Advance to next level or win
+                    if self.level < 2:
+                        self.advance_to_next_level()
+                    else:
+                        self.state = GameState.WIN
                     
         return True
         
@@ -860,12 +982,47 @@ class Game:
             
             font_large = pygame.font.Font(None, 72)
             complete_text = font_large.render("LEVEL COMPLETE!", True, GREEN)
-            text_rect = complete_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 50))
+            text_rect = complete_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 80))
             self.screen.blit(complete_text, text_rect)
             
-            score_text = font.render(f"Final Score: {self.score}", True, WHITE)
-            text_rect = score_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 20))
+            score_text = font.render(f"Score: {self.score}", True, WHITE)
+            text_rect = score_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 20))
             self.screen.blit(score_text, text_rect)
+            
+            if self.level < 2:
+                # Show next level option
+                next_text = font.render("Press SPACE for Next Level", True, YELLOW)
+                text_rect = next_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 20))
+                self.screen.blit(next_text, text_rect)
+            else:
+                # Show game complete option
+                win_text = font.render("Press SPACE to Complete Game", True, YELLOW)
+                text_rect = win_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 20))
+                self.screen.blit(win_text, text_rect)
+                
+        elif self.state == GameState.WIN:
+            # Draw win screen
+            overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT))
+            overlay.set_alpha(128)
+            overlay.fill(BLACK)
+            self.screen.blit(overlay, (0, 0))
+            
+            font_large = pygame.font.Font(None, 72)
+            win_text = font_large.render("CONGRATULATIONS!", True, GOLD)
+            text_rect = win_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 80))
+            self.screen.blit(win_text, text_rect)
+            
+            complete_text = font.render("You completed all levels!", True, WHITE)
+            text_rect = complete_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 20))
+            self.screen.blit(complete_text, text_rect)
+            
+            final_score_text = font.render(f"Final Score: {self.score}", True, YELLOW)
+            text_rect = final_score_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 20))
+            self.screen.blit(final_score_text, text_rect)
+            
+            restart_text = font.render("Press R to Restart", True, WHITE)
+            text_rect = restart_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 60))
+            self.screen.blit(restart_text, text_rect)
         
         pygame.display.flip()
         
